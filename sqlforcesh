@@ -1,0 +1,177 @@
+#!/usr/bin/python3
+
+import shlex
+import readline
+import sys
+import cmd
+import os
+import SQLForce
+from pprint import pprint
+from terminaltables import SingleTable
+
+class SQLForceShell(cmd.Cmd):
+    """ SQL shell for Salesforce using SQLForce python libraries. """
+    
+    prompt = 'sqlforce> '
+    intro = 'SQLForce python shell'
+
+    env = {
+            'login_type' : 'production',
+            'username' : 'troy@graphon.com',
+            'password' : '***REMOVED***',
+            'token' : '***REMOVED***'
+           }
+
+    WATCHED_FILES = [__file__]
+    WATCHED_FILES_MTIMES = [(f, os.path.getmtime(f)) for f in WATCHED_FILES]
+    READLINE_HISTORY_FILE = os.environ['HOME'] + "/.sqlforcesh-history"
+    RC_FILE = os.environ['HOME'] + "/.sqlforceshrc"
+
+    def __init__(self):
+        cmd.Cmd.__init__(self)
+        if os.path.exists(self.READLINE_HISTORY_FILE):
+            readline.read_history_file(self.READLINE_HISTORY_FILE)
+        if os.path.exists(self.RC_FILE):
+            with open(self.RC_FILE) as f:
+                self.cmdqueue.extend(f.read().splitlines())
+
+    def postcmd(self, stop, line):
+        for f, mtime in self.WATCHED_FILES_MTIMES:
+            if os.path.getmtime(f) > mtime:
+                self.do_restart("source changed")
+        return stop
+
+    def postloop(self):
+        readline.write_history_file(self.READLINE_HISTORY_FILE)
+
+    def do_restart(self, line):
+        """ restart
+            Restart the shell, reloading any changes to the source.
+            """
+        msg = "[restarting"
+        if line != "":
+            msg += ": " + line
+        msg += "]"
+        sys.stdout.write(msg+"\n")
+        readline.write_history_file(self.READLINE_HISTORY_FILE)
+        os.execvp(__file__,sys.argv)
+
+    def do_quit(self, line):
+        """ quit
+            Exits the shell.
+            """
+        return True
+
+    def do_EOF(self, line):
+        """ EOF
+            Quits the shell.
+            """
+        return True
+
+    def do_set(self, line):
+        """ set variable value
+            Sets the internal state variable to the specified value.
+            """
+        try:
+            if line == "":
+                self.do_help("set")
+                return
+            (var, val) = shlex.split(line)
+            self.env[var] = val
+            sys.stderr.write(var + "=" + val + "\n")
+        except Exception as e:
+            sys.stderr.write(e.message + "\n")
+
+    def do_env(self, line):
+        """ env
+            Print internal state variables.
+            """
+        try:
+            for key in self.env:
+                sys.stderr.write(key+"="+self.env[key]+"\n")
+        except Exception as e:
+            sys.stderr.write(e.message+"\n")
+
+    def do_connect(self, line):
+        """ connect
+            Establishes connection to Salesforce.
+            """
+        try:
+            self.session = SQLForce.Session(self.env['login_type'],
+                    self.env['username'], self.env['password']+self.env['token'])
+        except Exception as e:
+            sys.stderr.write(e.message+"\n")
+
+    def do_select(self, line):
+        """ select [query]
+            Perform SOQL select query
+            """
+        if not hasattr(self, 'session'):
+            sys.stderr.write("must connect to salesforce before querying"+"\n")
+            return
+
+        try:
+            data=[]
+            counting = False
+            count=0
+            if line.startswith('count()'):
+                line = line.replace('count()', 'Id', 1)
+                counting = True
+            for rec in self.session.selectRecords("SELECT " + line):
+                if count==0:
+                    dataline=[]
+                    for prop,val in vars(rec).items():
+                        if prop[0]=='_':
+                            continue
+                        dataline.append(prop)
+                    data.append(dataline)
+                for prop, val in vars(rec).items():
+                    if prop[0] == '_':
+                        continue
+                    dataline=[]
+                    dataline.append(val)
+                data.append(dataline)
+                count=count+1
+
+            table = SingleTable(data)
+            if not counting:
+                sys.stdout.write(table.table+"\n")
+            sys.stdout.write(str(count) + " records\n")
+        except Exception as e:
+            sys.stderr.write(str(e)+"\n")
+
+    def do_describe(self, line):
+        """ describe [object]
+            Describe fields in [object]
+            """
+        if not hasattr(self, 'session'):
+            sys.stderr.write("must connect to salesforce before querying"+"\n")
+            return
+
+        try:
+            data=[]
+            data.append(['Field Name', 'Type'])
+            fields = self.session.describeTable(line)
+            for field in fields:
+                data.append([field.name,field.type])
+            table = SingleTable(data)
+            sys.stdout.write(table.table+"\n")
+        except Exception as e:
+            sys.stderr.write(str(e)+"\n")
+
+    def do_insert(self, line):
+        """ INSERT into [table] (column[, column]*) VALUES(v1[,v2]*),[,([v1],[v2]*)]*
+            Inserts the provided values into the specified table.
+            """
+        if not hasattr(self, 'session'):
+            sys.stderr.write("must connect to salesforce before querying"+"\n")
+            return
+
+        try:
+            self.session.runCommands(line)
+            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+        except Exception as e:
+            sys.stderr.write(str(e)+"\n")
+
+if __name__ == '__main__':
+    SQLForceShell().cmdloop()
