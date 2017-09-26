@@ -6,8 +6,9 @@ import sys
 import cmd
 import os
 import SQLForce
+import configparser
 from pprint import pprint
-from terminaltables import SingleTable
+from terminaltables import SingleTable, AsciiTable, DoubleTable, GithubFlavoredMarkdownTable
 
 class SQLForceShell(cmd.Cmd):
     """ SQL shell for Salesforce using SQLForce python libraries. """
@@ -15,20 +16,18 @@ class SQLForceShell(cmd.Cmd):
     prompt = 'sqlforce> '
     intro = 'SQLForce python shell'
 
-    env = {
-            'login_type' : 'production',
-            'username' : 'troy@graphon.com',
-            'password' : '***REMOVED***',
-            'token' : '***REMOVED***'
-           }
-
     WATCHED_FILES = [__file__]
     WATCHED_FILES_MTIMES = [(f, os.path.getmtime(f)) for f in WATCHED_FILES]
     READLINE_HISTORY_FILE = os.environ['HOME'] + "/.sqlforcesh-history"
     RC_FILE = os.environ['HOME'] + "/.sqlforceshrc"
+    INI_FILE = os.environ['HOME'] + "/.sqlforcesh.ini"
 
     def __init__(self):
         cmd.Cmd.__init__(self)
+        self.config=configparser.ConfigParser()
+        self.config.read(self.INI_FILE)
+        self.profile = self.config.sections()[0]
+        sys.stderr.write("[using profile " + self.profile +"]\n")
         if os.path.exists(self.READLINE_HISTORY_FILE):
             readline.read_history_file(self.READLINE_HISTORY_FILE)
         if os.path.exists(self.RC_FILE):
@@ -43,6 +42,9 @@ class SQLForceShell(cmd.Cmd):
 
     def postloop(self):
         readline.write_history_file(self.READLINE_HISTORY_FILE)
+
+    def do_reload(self, line):
+        return self.do_restart(line)
 
     def do_restart(self, line):
         """ restart
@@ -68,6 +70,26 @@ class SQLForceShell(cmd.Cmd):
             """
         return True
 
+    def do_profile(self, line):
+        """ profile [profile-name]
+            Shows available profiles, or if specified sets the currently used profile.
+            """
+
+        try:
+            if line == "":
+                sys.stderr.write("Available profiles:\n")
+                for profile in self.config.sections():
+                    sys.stderr.write("\t"+profile)
+                sys.stderr.write("\n")
+            else:
+                if line in self.config.sections():
+                    self.profile=line
+                    self.do_connect("");
+                else:
+                    sys.stderr.write(line + ": no such profile")
+        except Exception as e:
+            sys.stderr.write(e.message+"\n")
+
     def do_set(self, line):
         """ set variable value
             Sets the internal state variable to the specified value.
@@ -77,8 +99,11 @@ class SQLForceShell(cmd.Cmd):
                 self.do_help("set")
                 return
             (var, val) = shlex.split(line)
-            self.env[var] = val
-            sys.stderr.write(var + "=" + val + "\n")
+            self.config.set(self.profile, var, val)
+            sys.stderr.write(self.profile + ": " + var + "=" + val + "\n")
+            cfgfile=open(self.INI_FILE,'w')
+            self.config.write(cfgfile)
+            cfgfile.close()
         except Exception as e:
             sys.stderr.write(e.message + "\n")
 
@@ -87,8 +112,8 @@ class SQLForceShell(cmd.Cmd):
             Print internal state variables.
             """
         try:
-            for key in self.env:
-                sys.stderr.write(key+"="+self.env[key]+"\n")
+            for key in self.config[self.profile]:
+                sys.stderr.write(key+"="+self.config[self.profile][key]+"\n")
         except Exception as e:
             sys.stderr.write(e.message+"\n")
 
@@ -97,8 +122,9 @@ class SQLForceShell(cmd.Cmd):
             Establishes connection to Salesforce.
             """
         try:
-            self.session = SQLForce.Session(self.env['login_type'],
-                    self.env['username'], self.env['password']+self.env['token'])
+            self.session = SQLForce.Session(self.config[self.profile]['login_type'],
+                    self.config[self.profile]['username'], self.config[self.profile]['password']+
+                    self.config[self.profile]['token'])
         except Exception as e:
             sys.stderr.write(e.message+"\n")
 
@@ -125,15 +151,22 @@ class SQLForceShell(cmd.Cmd):
                             continue
                         dataline.append(prop)
                     data.append(dataline)
+                dataline=[]
                 for prop, val in vars(rec).items():
                     if prop[0] == '_':
                         continue
-                    dataline=[]
                     dataline.append(val)
                 data.append(dataline)
                 count=count+1
 
-            table = SingleTable(data)
+            if self.config[self.profile]['table'] == 'ascii':
+                table = AsciiTable(data)
+            elif self.config[self.profile]['table'] == 'markdown':
+                table = GithubFlavoredMarkdownTable(data)
+            elif self.config[self.profile]['table'] == 'double':
+                table = DoubleTable(data)
+            else:
+                table = SingleTable(data)
             if not counting:
                 sys.stdout.write(table.table+"\n")
             sys.stdout.write(str(count) + " records\n")
@@ -169,6 +202,23 @@ class SQLForceShell(cmd.Cmd):
 
         try:
             self.session.runCommands(line)
+            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+        except Exception as e:
+            sys.stderr.write(str(e)+"\n")
+
+    def do_update(self, line):
+        """ UPDATE [table] SET col=val[, col=val] WHERE [condition]
+            Updates the specified columns with the specified values.  NOTE that
+            "val" values MUST BE CONSTANTS and will ALWAYS be interpreted as such.
+        """
+
+        if not hasattr(self, 'session'):
+            sys.stderr.write("must connect to salesforce before updating"+"\n")
+            return
+
+        try:
+            sys.stdout.write("update: " + line + "\n")
+            self.session.runCommands("UPDATE " + line)
             sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
         except Exception as e:
             sys.stderr.write(str(e)+"\n")

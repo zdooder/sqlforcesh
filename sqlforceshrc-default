@@ -1,0 +1,3 @@
+# Place in ~/.sqlforceshrc.  Commands listed here will automatically run when starting up.
+
+connect

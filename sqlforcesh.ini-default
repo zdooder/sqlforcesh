@@ -1,0 +1,22 @@
+# INI-style configuration for authentication and configuration
+#
+# login_type=[production|sandbox]
+# username=[e-mail address]
+# password=[password]
+# token=[security token]
+#
+# The first section is the default one
+[production]
+login_type=production
+username=troy@example.com
+password=this is not my password
+token=nor is this my token
+
+[sandbox]
+login_type=sandbox
+username=troy@example.com.dev
+password=this is not my password
+token=nor is this my token
+
+[DEFAULT]
+table=single
