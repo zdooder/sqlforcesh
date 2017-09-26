@@ -113,6 +113,7 @@ class SQLForceShell(cmd.Cmd):
             Print internal state variables.
             """
         try:
+            sys.stderr.write("["+self.profile+"]\n")
             for key in self.config[self.profile]:
                 sys.stderr.write(key+"="+self.config[self.profile][key]+"\n")
         except Exception as e:
@@ -202,7 +203,7 @@ class SQLForceShell(cmd.Cmd):
             return
 
         try:
-            self.session.runCommands(line)
+            self.session.runCommands("INSERT " + line)
             sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
         except Exception as e:
             sys.stderr.write(str(e)+"\n")
@@ -218,7 +219,6 @@ class SQLForceShell(cmd.Cmd):
             return
 
         try:
-            sys.stdout.write("update: " + line + "\n")
             self.session.runCommands("UPDATE " + line)
             sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
         except Exception as e:
