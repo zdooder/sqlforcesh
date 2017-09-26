@@ -35,9 +35,10 @@ class SQLForceShell(cmd.Cmd):
                 self.cmdqueue.extend(f.read().splitlines())
 
     def postcmd(self, stop, line):
-        for f, mtime in self.WATCHED_FILES_MTIMES:
-            if os.path.getmtime(f) > mtime:
-                self.do_restart("source changed")
+        if line != "quit":
+            for f, mtime in self.WATCHED_FILES_MTIMES:
+                if os.path.getmtime(f) > mtime:
+                    self.do_restart("source changed")
         return stop
 
     def postloop(self):
