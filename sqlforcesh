@@ -130,15 +130,23 @@ class SQLForceShell(cmd.Cmd):
         except Exception as e:
             sys.stderr.write(e.message+"\n")
 
+    def not_connected(self):
+        if not hasattr(self, 'session'):
+            sys.stderr.write("not connected; use \"connect\" first\n")
+            return True
+        else:
+            return False
+
     def do_select(self, line):
-        """ select [query]
+        """ SELECT [query]
             Perform SOQL select query
             """
-        if not hasattr(self, 'session'):
-            sys.stderr.write("must connect to salesforce before querying"+"\n")
-            return
+        if self.not_connected(): return
 
         try:
+            if line == "":
+                self.do_help("select")
+                return
             data=[]
             counting = False
             count=0
@@ -179,11 +187,12 @@ class SQLForceShell(cmd.Cmd):
         """ describe [object]
             Describe fields in [object]
             """
-        if not hasattr(self, 'session'):
-            sys.stderr.write("must connect to salesforce before querying"+"\n")
-            return
+        if self.not_connected(): return
 
         try:
+            if line == "":
+                self.do_help("describe")
+                return
             data=[]
             data.append(['Field Name', 'Type'])
             fields = self.session.describeTable(line)
@@ -198,11 +207,12 @@ class SQLForceShell(cmd.Cmd):
         """ INSERT into [table] (column[, column]*) VALUES(v1[,v2]*),[,([v1],[v2]*)]*
             Inserts the provided values into the specified table.
             """
-        if not hasattr(self, 'session'):
-            sys.stderr.write("must connect to salesforce before querying"+"\n")
-            return
+        if self.not_connected(): return
 
         try:
+            if line == "":
+                self.do_help("insert")
+                return
             self.session.runCommands("INSERT " + line)
             sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
         except Exception as e:
@@ -213,13 +223,27 @@ class SQLForceShell(cmd.Cmd):
             Updates the specified columns with the specified values.  NOTE that
             "val" values MUST BE CONSTANTS and will ALWAYS be interpreted as such.
         """
-
-        if not hasattr(self, 'session'):
-            sys.stderr.write("must connect to salesforce before updating"+"\n")
-            return
+        if self.not_connected(): return
 
         try:
+            if line == "":
+                self.do_help("update")
+                return
             self.session.runCommands("UPDATE " + line)
+            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+        except Exception as e:
+            sys.stderr.write(str(e)+"\n")
+
+    def do_delete(self, line):
+        """ DELETE FROM [table] WHERE [condition]
+            Deletes the rows matching [condition] from [table].
+            """
+        if self.not_connected(): return
+        try:
+            if line == "":
+                self.do_help("delete")
+                return
+            self.session.runCommands("DELETE " + line)
             sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
         except Exception as e:
             sys.stderr.write(str(e)+"\n")
