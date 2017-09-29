@@ -41,6 +41,14 @@ class SQLForceShell(cmd.Cmd):
                     self.do_restart("source changed")
         return stop
 
+    def run_command(self, cmd):
+        ret = self.session.runCommands(cmd)
+        if ( not ret.successful ):
+            sys.stderr.write('command failed: ' + cmd +"\n" +
+                             '                ' + ret.message)
+        else:
+            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+
     def postloop(self):
         readline.write_history_file(self.READLINE_HISTORY_FILE)
 
@@ -213,8 +221,7 @@ class SQLForceShell(cmd.Cmd):
             if line == "":
                 self.do_help("insert")
                 return
-            self.session.runCommands("INSERT " + line)
-            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+            self.run_command("INSERT " + line)
         except Exception as e:
             sys.stderr.write(str(e)+"\n")
 
@@ -229,8 +236,7 @@ class SQLForceShell(cmd.Cmd):
             if line == "":
                 self.do_help("update")
                 return
-            self.session.runCommands("UPDATE " + line)
-            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+            self.run_command('UPDATE ' + line)
         except Exception as e:
             sys.stderr.write(str(e)+"\n")
 
@@ -243,8 +249,7 @@ class SQLForceShell(cmd.Cmd):
             if line == "":
                 self.do_help("delete")
                 return
-            self.session.runCommands("DELETE " + line)
-            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+            self.run_command("DELETE " + line)
         except Exception as e:
             sys.stderr.write(str(e)+"\n")
 
