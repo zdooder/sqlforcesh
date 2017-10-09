@@ -1,6 +1,11 @@
 ## sqlforcesh
 
-sqlforcesh is a simple command-line shell in python that uses the very excellent SQLForce library from Capstorm to provide a query interface to Salesforce instances.
+sqlforcesh is a simple command-line shell in python that uses the very excellent 
+[SQLForce library from Capstorm](https://www.capstorm.com/sqlforce-project)
+to provide a basic interface to Salesforce instances.  
+
+The interface is probably reasonably familiar to people who have used MySQL or
+Postgres databases before.
 
 ## Example
 
@@ -44,10 +49,17 @@ sqlforce>
 
 ## Motiviation
 
-SQLForce used to include such a shell, but recent versions seem to have abandoned it.  I have come to rely on
-using the shell for various "quick and dirty" queries, so I've created this as a replacement.
+SQLForce used to include such a shell in its distribution, but recent versions no longer include it.
+Since I have come to rely on using the shell for various "quick and dirty" queries and updates, I've 
+created this as a replacement.
+
+This code is not particularly elegant or clever, but if it works that's what I consider important.
 
 ## Installation
 
 Currently this needs the SQLForce package and terminaltables python module.
+
+There is a sample config in `sqlforcesh.ini-default` and `sqlforceshrc-default`.  The script looks for
+them in your home directory.  I built (and use) this on Linux, so Windows and Mac users are welcome to 
+adjust as needed.
 
