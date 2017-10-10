@@ -7,7 +7,8 @@ import cmd
 import os
 import SQLForce
 import configparser
-from pprint import pprint
+import inspect
+from beeprint import pp
 from terminaltables import SingleTable, AsciiTable, DoubleTable, GithubFlavoredMarkdownTable
 
 class SQLForceShell(cmd.Cmd):
@@ -145,6 +146,22 @@ class SQLForceShell(cmd.Cmd):
         else:
             return False
 
+    def parse_head(self, base, prop, val, dataline):
+        if type(val).__name__=='_SQLForceRecordColumn':
+            for prop2,val2 in vars(val).items():
+                self.parse_head(prop, prop2, val2, dataline)
+        else:
+            if base != "":
+                base += "."
+            dataline.append(base + prop)
+
+    def parse_val(self, base, prop, val, dataline):
+        if type(val).__name__=='_SQLForceRecordColumn':
+            for prop2, val2 in vars(val).items():
+                self.parse_val(prop, prop2, val2, dataline)
+        else:
+            dataline.append(val)
+
     def do_select(self, line):
         """ SELECT [query]
             Perform SOQL select query
@@ -162,18 +179,19 @@ class SQLForceShell(cmd.Cmd):
                 line = line.replace('count()', 'Id', 1)
                 counting = True
             for rec in self.session.selectRecords("SELECT " + line):
-                if count==0:
+                if count==0: # in parsing the first row grab column headings
+                             # for the data table
                     dataline=[]
                     for prop,val in vars(rec).items():
-                        if prop[0]=='_':
+                        if prop[0]=='_': # skip the table name
                             continue
-                        dataline.append(prop)
+                        self.parse_head("", prop, val, dataline)
                     data.append(dataline)
                 dataline=[]
-                for prop, val in vars(rec).items():
-                    if prop[0] == '_':
+                for prop, val in vars(rec).items(): # now read the actual data
+                    if prop[0] == '_': # skipping the table name
                         continue
-                    dataline.append(val)
+                    self.parse_val("", prop, val, dataline)
                 data.append(dataline)
                 count=count+1
 
