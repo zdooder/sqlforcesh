@@ -8,6 +8,7 @@ import os
 import SQLForce
 import configparser
 import inspect
+import time
 from beeprint import pp
 from terminaltables import SingleTable, AsciiTable, DoubleTable, GithubFlavoredMarkdownTable
 
@@ -66,6 +67,24 @@ class SQLForceShell(cmd.Cmd):
         msg += "]"
         sys.stdout.write(msg+"\n")
         readline.write_history_file(self.READLINE_HISTORY_FILE)
+        self.do_disconnect("")
+        # SQLForce uses a jetty java process to communicate to SQLForce.
+        # If we re-exec ourselves, the atexit() handler to kill that server
+        # never gets called, and I don't think that the SQLForceServer module
+        # handles having a new server started anyway.  The real problem with this
+        # is that the new process has no record of the old java process, so starts
+        # a new one and never kills the old one.  For now we'll fudge and manually
+        # kill off the java process here.
+        try:
+            from SQLForce import SQLForceServer
+            SQLForceServer.killServer()
+            time.sleep(1) # give it a chance to exit
+            pid = 1 # prime the loop
+            while pid != 0:
+                pid,status=os.waitpid(-1,os.WNOHANG) # reap children
+                time.sleep(0.1) # in a loop until there are no more
+        except ChildProcessError:
+            pass
         os.execvp(__file__,sys.argv)
 
     def do_quit(self, line):
@@ -108,6 +127,7 @@ class SQLForceShell(cmd.Cmd):
             if line == "":
                 self.do_help("set")
                 return
+            line=line.replace("=", " ") # Because I keep typing "set var=val" instead of "set var val"
             (var, val) = shlex.split(line)
             self.config.set(self.profile, var, val)
             sys.stderr.write(self.profile + ": " + var + "=" + val + "\n")
@@ -136,6 +156,15 @@ class SQLForceShell(cmd.Cmd):
             self.session = SQLForce.Session(self.config[self.profile]['login_type'],
                     self.config[self.profile]['username'], self.config[self.profile]['password']+
                     self.config[self.profile]['token'])
+        except Exception as e:
+            sys.stderr.write(e.message+"\n")
+
+    def do_disconnect(self, line):
+        """ disconnect
+            Disconnects and logs out from Salesforce.
+            """
+        try:
+            self.session.logout()
         except Exception as e:
             sys.stderr.write(e.message+"\n")
 
@@ -203,7 +232,7 @@ class SQLForceShell(cmd.Cmd):
                 table = DoubleTable(data)
             else:
                 table = SingleTable(data)
-            if not counting:
+            if count>0 and not counting:
                 sys.stdout.write(table.table+"\n")
             sys.stdout.write(str(count) + " records\n")
         except Exception as e:
