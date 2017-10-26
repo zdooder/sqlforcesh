@@ -9,14 +9,18 @@ import SQLForce
 import configparser
 import inspect
 import time
-from beeprint import pp
+from blessings import Terminal
+# from beeprint import pp # only for debugging
 from terminaltables import SingleTable, AsciiTable, DoubleTable, GithubFlavoredMarkdownTable
+
+t = Terminal()
 
 class SQLForceShell(cmd.Cmd):
     """ SQL shell for Salesforce using SQLForce python libraries. """
     
-    prompt = 'sqlforce> '
-    intro = 'SQLForce python shell'
+    version = "0.48"
+    prompt = '\001{t.bright_yellow}\002sqlforce\001{t.bright_cyan}\002>\001{t.normal}\002 '.format(t=t)
+    intro = ('{t.bold_underline_yellow_on_blue}SQLForce python shell v{t.white}' + version + '{t.normal}').format(t=t)
 
     WATCHED_FILES = [__file__]
     WATCHED_FILES_MTIMES = [(f, os.path.getmtime(f)) for f in WATCHED_FILES]
@@ -43,13 +47,16 @@ class SQLForceShell(cmd.Cmd):
                     self.do_restart("source changed")
         return stop
 
+    def error(self, err):
+        sys.stderr.write('{t.bright_red}{err}{t.normal}'.format(t=t,err=err))
+
     def run_command(self, cmd):
         ret = self.session.runCommands(cmd)
         if ( not ret.successful ):
-            sys.stderr.write('command failed: ' + cmd +"\n" +
+            self.error('command failed: ' + cmd +"\n" +
                              '                ' + ret.message)
         else:
-            sys.stdout.write(self.session.getenv('ROW_COUNT') + " records\n")
+            sys.stdout.write(('{t.bright_yellow}' + self.session.getenv('ROW_COUNT') + '{t.normal} records\n').format(t=t))
 
     def postloop(self):
         readline.write_history_file(self.READLINE_HISTORY_FILE)
@@ -115,9 +122,9 @@ class SQLForceShell(cmd.Cmd):
                     self.profile=line
                     self.do_connect("");
                 else:
-                    sys.stderr.write(line + ": no such profile")
+                    self.error(line + ": no such profile")
         except Exception as e:
-            sys.stderr.write(e.message+"\n")
+            self.error(e.message+"\n")
 
     def do_set(self, line):
         """ set variable value
@@ -135,7 +142,7 @@ class SQLForceShell(cmd.Cmd):
             self.config.write(cfgfile)
             cfgfile.close()
         except Exception as e:
-            sys.stderr.write(e.message + "\n")
+            self.error(e.message + "\n")
 
     def do_env(self, line):
         """ env
@@ -146,7 +153,7 @@ class SQLForceShell(cmd.Cmd):
             for key in self.config[self.profile]:
                 sys.stderr.write(key+"="+self.config[self.profile][key]+"\n")
         except Exception as e:
-            sys.stderr.write(e.message+"\n")
+            self.error(e.message+"\n")
 
     def do_connect(self, line):
         """ connect
@@ -157,7 +164,7 @@ class SQLForceShell(cmd.Cmd):
                     self.config[self.profile]['username'], self.config[self.profile]['password']+
                     self.config[self.profile]['token'])
         except Exception as e:
-            sys.stderr.write(e.message+"\n")
+            self.error(e.message+"\n")
 
     def do_disconnect(self, line):
         """ disconnect
@@ -166,11 +173,11 @@ class SQLForceShell(cmd.Cmd):
         try:
             self.session.logout()
         except Exception as e:
-            sys.stderr.write(e.message+"\n")
+            self.error(e.message+"\n")
 
     def not_connected(self):
         if not hasattr(self, 'session'):
-            sys.stderr.write("not connected; use \"connect\" first\n")
+            self.error("not connected; use \"connect\" first\n")
             return True
         else:
             return False
@@ -236,7 +243,7 @@ class SQLForceShell(cmd.Cmd):
                 sys.stdout.write(table.table+"\n")
             sys.stdout.write(str(count) + " records\n")
         except Exception as e:
-            sys.stderr.write(str(e)+"\n")
+            self.error(str(e)+"\n")
 
     def do_describe(self, line):
         """ describe [object]
@@ -256,7 +263,7 @@ class SQLForceShell(cmd.Cmd):
             table = SingleTable(data)
             sys.stdout.write(table.table+"\n")
         except Exception as e:
-            sys.stderr.write(str(e)+"\n")
+            self.error(str(e)+"\n")
 
     def do_insert(self, line):
         """ INSERT into [table] (column[, column]*) VALUES(v1[,v2]*),[,([v1],[v2]*)]*
@@ -270,7 +277,7 @@ class SQLForceShell(cmd.Cmd):
                 return
             self.run_command("INSERT " + line)
         except Exception as e:
-            sys.stderr.write(str(e)+"\n")
+            self.error(str(e)+"\n")
 
     def do_update(self, line):
         """ UPDATE [table] SET col=val[, col=val] WHERE [condition]
@@ -285,7 +292,7 @@ class SQLForceShell(cmd.Cmd):
                 return
             self.run_command('UPDATE ' + line)
         except Exception as e:
-            sys.stderr.write(str(e)+"\n")
+            self.error(str(e)+"\n")
 
     def do_delete(self, line):
         """ DELETE FROM [table] WHERE [condition]
@@ -298,7 +305,7 @@ class SQLForceShell(cmd.Cmd):
                 return
             self.run_command("DELETE " + line)
         except Exception as e:
-            sys.stderr.write(str(e)+"\n")
+            self.error(str(e)+"\n")
 
 if __name__ == '__main__':
     SQLForceShell().cmdloop()
