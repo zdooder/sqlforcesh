@@ -47,7 +47,7 @@ sqlforce> describe Payment__c
 sqlforce>
 ```
 
-## Motiviation
+## Motivation
 
 SQLForce used to include such a shell in its distribution, but recent versions no longer include it.
 Since I have come to rely on using the shell for various "quick and dirty" queries and updates, I've 
