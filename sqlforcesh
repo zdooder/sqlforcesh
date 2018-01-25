@@ -3,7 +3,7 @@
 import shlex
 import readline
 import sys
-import cmd
+from  cmd2 import Cmd
 import os
 import SQLForce
 import configparser
@@ -15,11 +15,11 @@ from terminaltables import SingleTable, AsciiTable, DoubleTable, GithubFlavoredM
 
 t = Terminal()
 
-class SQLForceShell(cmd.Cmd):
+class SQLForceShell(Cmd):
     """ SQL shell for Salesforce using SQLForce python libraries. """
     
     version = "0.48"
-    prompt = '\001{t.bright_yellow}\002sqlforce\001{t.bright_cyan}\002>\001{t.normal}\002 '.format(t=t)
+    prompt = '\001{t.bold_bright_green}\002sqlforce\001{t.bold_bright_cyan}\002>\001{t.normal}\002 '.format(t=t)
     intro = ('{t.bold_underline_yellow_on_blue}SQLForce python shell v{t.white}' + version + '{t.normal}').format(t=t)
 
     WATCHED_FILES = [__file__]
@@ -29,7 +29,8 @@ class SQLForceShell(cmd.Cmd):
     INI_FILE = os.environ['HOME'] + "/.sqlforcesh.ini"
 
     def __init__(self):
-        cmd.Cmd.__init__(self)
+        Cmd.__init__(self)
+        self.multilineCommands = [ 'select', 'update', 'delete', 'insert' ]
         self.config=configparser.ConfigParser()
         self.config.read(self.INI_FILE)
         self.profile = self.config.sections()[0]
@@ -39,6 +40,9 @@ class SQLForceShell(cmd.Cmd):
         if os.path.exists(self.RC_FILE):
             with open(self.RC_FILE) as f:
                 self.cmdqueue.extend(f.read().splitlines())
+
+    def emptyline():
+        pass
 
     def postcmd(self, stop, line):
         if line != "quit":
@@ -51,12 +55,13 @@ class SQLForceShell(cmd.Cmd):
         sys.stderr.write('{t.bright_red}{err}{t.normal}'.format(t=t,err=err))
 
     def run_command(self, cmd):
+        cmd = cmd.replace("!=", "<>")
         ret = self.session.runCommands(cmd)
         if ( not ret.successful ):
             self.error('command failed: ' + cmd +"\n" +
                              '                ' + ret.message)
         else:
-            sys.stdout.write(('{t.bright_yellow}' + self.session.getenv('ROW_COUNT') + '{t.normal} records\n').format(t=t))
+            sys.stdout.write(('{t.bright_green}' + self.session.getenv('ROW_COUNT') + '{t.normal} records\n').format(t=t))
 
     def postloop(self):
         readline.write_history_file(self.READLINE_HISTORY_FILE)
@@ -197,6 +202,27 @@ class SQLForceShell(cmd.Cmd):
                 self.parse_val(prop, prop2, val2, dataline)
         else:
             dataline.append(val)
+
+    def do_table2sql(self, line):
+        """ TABLE2SQL
+            Takes next set of input and formats each line as an element in an SQL "IN" statement, in preparation
+            to be included in an SQL Query.
+            """
+        try:
+            sys.stdout.write("Enter data, one item per line, end with \".\" alone on a line.\n===\n")
+            lines = [];
+            while True:
+                line = sys.stdin.readline()
+                line = line.strip("\n\r")
+                if line == '.':
+                    break;
+                lines.append(line)
+
+            sys.stdout.write("\n===\n")
+            for group in (lines[pos:pos+250] for pos in range(0, len(lines), 250)):
+                sys.stdout.write("IN ('" + "','".join(group) + "')\n");
+        except Exception as e:
+            self.error(str(e)+"\n")
 
     def do_select(self, line):
         """ SELECT [query]
