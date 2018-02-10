@@ -214,8 +214,10 @@ class SQLForceShell(Cmd):
             while True:
                 line = sys.stdin.readline()
                 line = line.strip("\n\r")
-                if line == '.':
-                    break;
+                if len(line) ==0:
+                    continue
+                if line == '.': 
+                    break
                 lines.append(line)
 
             sys.stdout.write("\n===\n")
