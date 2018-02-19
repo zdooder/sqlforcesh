@@ -13,6 +13,19 @@ from blessings import Terminal
 # from beeprint import pp # only for debugging
 from terminaltables import SingleTable, AsciiTable, DoubleTable, GithubFlavoredMarkdownTable
 
+#def exception_info(type, value, tb):
+#    if hasattr(sys, 'ps1') or not sys.stderr.isatty():
+#        # in interactive mode or no tty, use default processing
+#        sys.__excepthook__(type, value, tb)
+#    else:
+#        import traceback, pdb
+#        traceback.print_exception(type, value, tb)
+#        print
+#        # start the debugger
+#        pdb.post_mortem(tb)
+#
+#sys.excepthook = exception_info
+
 t = Terminal()
 
 class SQLForceShell(Cmd):
@@ -56,6 +69,10 @@ class SQLForceShell(Cmd):
 
     def run_command(self, cmd):
         cmd = cmd.replace("!=", "<>")
+        cmd = cmd.replace(" ge ", ">=")
+        cmd = cmd.replace(" le ", "<=")
+        cmd = cmd.replace(" lt ", "<")
+        cmd = cmd.replace(" gt ", ">")
         ret = self.session.runCommands(cmd)
         if ( not ret.successful ):
             self.error('command failed: ' + cmd +"\n" +
@@ -236,6 +253,11 @@ class SQLForceShell(Cmd):
             if line == "":
                 self.do_help("select")
                 return
+            line = line.replace("!=", "<>")
+            line = line.replace(" ge ", ">=")
+            line = line.replace(" le ", "<=")
+            line = line.replace(" lt ", "<")
+            line = line.replace(" gt ", ">")
             data=[]
             counting = False
             count=0
