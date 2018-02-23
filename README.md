@@ -46,6 +46,17 @@ sqlforce> describe Payment__c
 └────────────────────────┴───────────┘
 sqlforce>
 ```
+## Caveats
+
+* Because Cmd(2) implements output redirection using the greater-than symbol, sqlforcesh instead expects you to use modified constructs in your queries:
+
+  Instead of: | Use this: | To mean:
+  ------------|-----------|----------
+  <>          | !=        | not equal to
+  <           | lt        | less than
+  >           | gt        | greater than
+  <=          | le        | less than or equal
+  >=          | ge        | greater than or equal
 
 ## Motivation
 
