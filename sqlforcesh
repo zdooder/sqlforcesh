@@ -31,7 +31,7 @@ t = Terminal()
 class SQLForceShell(Cmd):
     """ SQL shell for Salesforce using SQLForce python libraries. """
     
-    version = "0.48"
+    version = "0.56"
     prompt = '\001{t.bold_bright_green}\002sqlforce\001{t.bold_bright_cyan}\002>\001{t.normal}\002 '.format(t=t)
     intro = ('{t.bold_underline_yellow_on_blue}SQLForce python shell v{t.white}' + version + '{t.normal}').format(t=t)
 
@@ -144,7 +144,7 @@ class SQLForceShell(Cmd):
                     self.profile=line
                     self.do_connect("");
                 else:
-                    self.error(line + ": no such profile")
+                    self.error(line + ": no such profile\n")
         except Exception as e:
             self.error(e.message+"\n")
 
@@ -218,7 +218,31 @@ class SQLForceShell(Cmd):
             for prop2, val2 in vars(val).items():
                 self.parse_val(prop, prop2, val2, dataline)
         else:
+            if val == None:
+                val = ''
             dataline.append(val)
+
+    def do_table2apex(self, line):
+        """ TABLE2APEX
+            Takes next set of input and formats each line as an element in an APEX List<> object.
+        """
+        try:
+            sys.stdout.write("Enter data, one item per line, end with \".\" along on a line.\n===\n")
+            lines = []
+            while True:
+                line = sys.stdin.readline()
+                line = line.strip("\r\n")
+                if len(line) == 0:
+                    continue
+                if line == '.':
+                    break
+                lines.append(line)
+
+            sys.stdout.write("\n===\n")
+            for group in (lines[pos:pos+250] for pos in range(0, len(lines), 250)):
+                sys.stdout.write("{'" + "','".join(group) + "'}\n")
+        except Exception as e:
+            self.error(str(e)+"\n")
 
     def do_table2sql(self, line):
         """ TABLE2SQL
@@ -242,6 +266,23 @@ class SQLForceShell(Cmd):
                 sys.stdout.write("IN ('" + "','".join(group) + "')\n");
         except Exception as e:
             self.error(str(e)+"\n")
+
+    def getTable(self, data):
+        if self.config[self.profile]['table'] == 'ascii':
+            table = AsciiTable(data)
+        elif self.config[self.profile]['table'] == 'markdown':
+            table = GithubFlavoredMarkdownTable(data)
+        elif self.config[self.profile]['table'] == 'double':
+            table = DoubleTable(data)
+        elif self.config[self.profile]['table'] == 'single':
+            table = SingleTable(data)
+        else:
+            # The the largest entry in the data
+            maxlen = '{:' + str(max([max(len(elem) for elem in row) for row in data])+1) + '}'
+            # build a table from the data
+            table = type('', (), {})
+            table.table = '\n'.join([''.join([maxlen.format(item) for item in row]) for row in data])
+        return table
 
     def do_select(self, line):
         """ SELECT [query]
@@ -281,14 +322,7 @@ class SQLForceShell(Cmd):
                 data.append(dataline)
                 count=count+1
 
-            if self.config[self.profile]['table'] == 'ascii':
-                table = AsciiTable(data)
-            elif self.config[self.profile]['table'] == 'markdown':
-                table = GithubFlavoredMarkdownTable(data)
-            elif self.config[self.profile]['table'] == 'double':
-                table = DoubleTable(data)
-            else:
-                table = SingleTable(data)
+            table = self.getTable(data)
             if count>0 and not counting:
                 sys.stdout.write(table.table+"\n")
             sys.stdout.write(str(count) + " records\n")
