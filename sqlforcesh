@@ -277,11 +277,16 @@ class SQLForceShell(Cmd):
         elif self.config[self.profile]['table'] == 'single':
             table = SingleTable(data)
         else:
-            # The the largest entry in the data
+            sep = ''
             maxlen = '{:' + str(max([max(len(elem) for elem in row) for row in data])+1) + '}'
+            if self.config[self.profile]['table'] == 'csv':
+                sep=','
+                maxlen = '{}'
+                # FIXME doesn't handle csv escapes yet
+            # The the largest entry in the data
             # build a table from the data
             table = type('', (), {})
-            table.table = '\n'.join([''.join([maxlen.format(item) for item in row]) for row in data])
+            table.table = '\n'.join([sep.join([maxlen.format(item) for item in row]) for row in data])
         return table
 
     def do_select(self, line):
@@ -322,8 +327,8 @@ class SQLForceShell(Cmd):
                 data.append(dataline)
                 count=count+1
 
-            table = self.getTable(data)
             if count>0 and not counting:
+                table = self.getTable(data)
                 sys.stdout.write(table.table+"\n")
             sys.stdout.write(str(count) + " records\n")
         except Exception as e:
@@ -344,7 +349,7 @@ class SQLForceShell(Cmd):
             fields = self.session.describeTable(line)
             for field in fields:
                 data.append([field.name,field.type])
-            table = SingleTable(data)
+            table = self.getTable(data)
             sys.stdout.write(table.table+"\n")
         except Exception as e:
             self.error(str(e)+"\n")
